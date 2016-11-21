@@ -3,16 +3,22 @@
 require_once("Player.php");
 require_once("Team.php");
 
+$files = scandir('source/matches');
+array_shift($files);
+array_shift($files);
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
-$string = mb_convert_encoding(file_get_contents("source/matches/1024102.json"), 'HTML-ENTITIES', "UTF-8");
-$events = json_decode($string, true);
 
-$playersTimeOnTheField = [];
+foreach ($files as $file) {
+    $filename = pathinfo($file, PATHINFO_FILENAME);
+    $string = mb_convert_encoding(file_get_contents("source/matches/" . $filename . ".json"), 'HTML-ENTITIES', "UTF-8");
+    $events = json_decode($string, true);
+
+    $playersTimeOnTheField = [];
 
 //TODO потом убрать отсюда html куда нибудь в отдельный файл
-$fileContent = '<html>
+    $fileContent = '<html>
 <head>
     <meta charset="UTF-8">
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
@@ -24,118 +30,116 @@ $fileContent = '<html>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
 </head>
 <body>';
-$fp = fopen("file.html", "w");
-$teams = [];
-$eventsTable = '<table class="table events">';
-$tHead = '<tr>
+    $filePointer = fopen("result/" . $filename . ".html", "w");
+    $teams = [];
+    $eventsTable = '<table class="table events">';
+    $tHead = '<tr>
     <th>Время</th>
     <th>Описание</th>
   </tr>';
-$eventsTable = $eventsTable . $tHead;
+    $eventsTable = $eventsTable . $tHead;
 
-foreach ($events as $record) {
-    switch ($record['type']) {
-        case 'info':
-            $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] .  '</td>' . '<td>' . $record['description'] .  '</td>' . '</tr>';
+    foreach ($events as $record) {
+        switch ($record['type']) {
+            case 'info':
+                $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] . '</td>' . '<td>' . $record['description'] . '</td>' . '</tr>';
 
-            break;
-        case 'startPeriod':
-            $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] .  '</td>' . '<td>' . $record['description'] .  '</td>' . '</tr>';
+                break;
+            case 'startPeriod':
+                $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] . '</td>' . '<td>' . $record['description'] . '</td>' . '</tr>';
 
-            if (!empty($record['details'])){
-                $teamOnePlayersJson = $record['details']['team1']['players'];
-                $teamOnePlayers = [];
+                if (!empty($record['details'])) {
+                    $teamOnePlayersJson = $record['details']['team1']['players'];
+                    $teamOnePlayers = [];
 
-                foreach ($teamOnePlayersJson as $teamOnePlayerJson) {
-                    $newPlayer = new Player(); //TODO написать конструктор
-                    $newPlayer->setName($teamOnePlayerJson['name']);
-                    $newPlayer->setNumber($teamOnePlayerJson['number']);
-                    $teamOnePlayers[$teamOnePlayerJson['number']] = $newPlayer;
+                    foreach ($teamOnePlayersJson as $teamOnePlayerJson) {
+                        $newPlayer = new Player(); //TODO написать конструктор
+                        $newPlayer->setName($teamOnePlayerJson['name']);
+                        $newPlayer->setNumber($teamOnePlayerJson['number']);
+                        $teamOnePlayers[$teamOnePlayerJson['number']] = $newPlayer;
+                    }
+
+                    $teamOne = new Team();
+                    $teamOne->setPlayers($teamOnePlayers);
+                    $teamOne->setTitle($record['details']['team1']['title']);
+
+                    $team[$record['details']['team1']['title']] = $teamOne;
+                    $teamTwoPlayersJson = $record['details']['team2']['players'];
+                    $teamOnePlayers = [];
+
+                    foreach ($teamTwoPlayersJson as $teamTwoPlayerJson) {
+                        $newPlayer = new Player(); //TODO написать конструктор
+                        $newPlayer->setName($teamTwoPlayerJson['name']);
+                        $newPlayer->setNumber($teamTwoPlayerJson['number']);
+                        $teamOnePlayers[$teamTwoPlayerJson['number']] = $newPlayer;
+                    }
+
+                    $teamTwo = new Team();
+                    $teamTwo->setPlayers($teamOnePlayers);
+                    $teamTwo->setTitle($record['details']['team2']['title']);
+                    $team[$record['details']['team2']['title']] = $teamTwo;
                 }
 
-                $teamOne = new Team();
-                $teamOne->setPlayers($teamOnePlayers);
-                $teamOne->setTitle($record['details']['team1']['title']);
+                break;
+            case 'dangerousMoment':
+                $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] . '</td>' . '<td>' . $record['description'] . '</td>' . '</tr>';
 
-                $team[$record['details']['team1']['title']] = $teamOne;
+                break;
+            case 'yellowCard':
+                $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] . '</td>' . '<td>' . $record['description'] . '</td>' . '</tr>';
 
-                $teamTwoPlayersJson = $record['details']['team2']['players'];
+                break;
+            case 'goal':
+                $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] . '</td>' . '<td>' . $record['description'] . '</td>' . '</tr>';
 
-                $teamOnePlayers = [];
-
-                foreach ($teamTwoPlayersJson as $teamTwoPlayerJson) {
-                    $newPlayer = new Player(); //TODO написать конструктор
-                    $newPlayer->setName($teamTwoPlayerJson['name']);
-                    $newPlayer->setNumber($teamTwoPlayerJson['number']);
-                    $teamOnePlayers[$teamTwoPlayerJson['number']] = $newPlayer;
+                $players = $team[$record['details']['team']]->getPlayers();
+                $goalAuthor = $players[$record['details']['playerNumber']];
+                $goalAuthor->setGoals($goalAuthor->getGoals() + 1);
+                //TODO ассистента гола тоже нужно фиксировать
+                if (!empty($record['details']['assistantNumber'])) {
+                    $goalAssistant = $players[$record['details']['assistantNumber']];
+                    $goalAssistant->setGoalPases($goalAssistant->getGoalPases() + 1);
                 }
 
-                $teamTwo = new Team();
-                $teamTwo->setPlayers($teamOnePlayers);
-                $teamTwo->setTitle($record['details']['team2']['title']);
-                $team[$record['details']['team2']['title']] = $teamTwo;
-            }
+                $team[$record['details']['team']]->setGoals($team[$record['details']['team']]->getGoals() + 1);
 
-            break;
-        case 'dangerousMoment':
-            $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] .  '</td>' . '<td>' . $record['description'] .  '</td>' . '</tr>';
+                break;
+            case 'finishPeriod':
+                $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] . '</td>' . '<td>' . $record['description'] . '</td>' . '</tr>';
 
-            break;
-        case 'yellowCard':
-            $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] .  '</td>' . '<td>' . $record['description'] .  '</td>' . '</tr>';
+                break;
+            case 'replacePlayer':
+                $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] . '</td>' . '<td>' . $record['description'] . '</td>' . '</tr>';
 
-            break;
-        case 'goal':
-            $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] .  '</td>' . '<td>' . $record['description'] .  '</td>' . '</tr>';
-
-            $players = $team[$record['details']['team']]->getPlayers();
-            $goalAuthor = $players[$record['details']['playerNumber']];
-            $goalAuthor->setGoals($goalAuthor->getGoals() + 1);
-            //TODO ассистента гола тоже нужно фиксировать
-            if (!empty($record['details']['assistantNumber'])) {
-                $goalAssistant = $players[$record['details']['assistantNumber']];
-                $goalAssistant->setGoalPases($goalAssistant->getGoalPases() + 1);
-            }
-
-            $team[$record['details']['team']]->setGoals($team[$record['details']['team']]->getGoals() + 1);
-
-            break;
-        case 'finishPeriod':
-            $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] .  '</td>' . '<td>' . $record['description'] .  '</td>' . '</tr>';
-
-            break;
-        case 'replacePlayer':
-            $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] .  '</td>' . '<td>' . $record['description'] .  '</td>' . '</tr>';
-
-            break;
+                break;
+        }
     }
-}
 
-$eventsTable = $eventsTable . '</table>';
-$overallScore = '<table class="table score"><tr><td>' . $teamOne->getTitle() . '</td><td>' . $teamOne->getGoals() . ' : ' . $teamTwo->getGoals() . '</td><td>' . $teamTwo->getTitle() . '</td></tr></table>';
-$fileContent = $fileContent . $overallScore;
-$fileContent = $fileContent . $eventsTable;
+    $eventsTable = $eventsTable . '</table>';
+    $overallScore = '<table class="table score"><tr><td>' . $teamOne->getTitle() . '</td><td>' . $teamOne->getGoals() . ' : ' . $teamTwo->getGoals() . '</td><td>' . $teamTwo->getTitle() . '</td></tr></table>';
+    $fileContent = $fileContent . $overallScore;
+    $fileContent = $fileContent . $eventsTable;
 
-foreach ($team as $teamItem) {
-    $playersTable = '<table border="2" class="table players">';
-    $tHead = '<tr>
+    foreach ($team as $teamItem) { //TODO cделать что то с этими кусками html
+        $playersTable = '<table border="2" class="table players">';
+        $tHead = '<tr>
     <th>Имя игрока</th>
     <th>Голы</th>
     <th>Голевые передачи</th>
   </tr>';
-    $playersTable = $playersTable . $tHead;
-    foreach ($teamItem->getPlayers() as $player) {
-        $tableRow = "<tr><td>" . $player->getName() . "</td>
+        $playersTable = $playersTable . $tHead;
+        foreach ($teamItem->getPlayers() as $player) {
+            $tableRow = "<tr><td>" . $player->getName() . "</td>
         <td>" . $player->getGoals() . "</td>
         <td>" . $player->getGoalPases() . "</td></tr>";
-        $playersTable = $playersTable . $tableRow;
+            $playersTable = $playersTable . $tableRow;
+        }
+        $playersTable = $playersTable . '</table>';
+        $fileContent = $fileContent . $playersTable;
     }
-    $playersTable = $playersTable . '</table>';
-    $fileContent = $fileContent . $playersTable;
+
+    fwrite($filePointer, $fileContent . '</body></html>');
+    fclose($filePointer);
+    chmod("result/" . $filename . ".html", 0777);
 }
-
-fwrite($fp, $fileContent . '</body></html>');
-fclose($fp);
-chmod("file.html", 0777);
-
 ?>
