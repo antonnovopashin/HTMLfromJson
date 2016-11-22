@@ -137,7 +137,6 @@ foreach ($files as $file) {
 
                 break;
             case 'finishPeriod':
-                echo $record['time'] . ' : период зкончился <br>';
                 $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] . '</td>' . '<td>' . $record['description'] . '</td>' . '</tr>';
 
                 //тут нужно подсчитать и зафиксировать время проведенное игроками на поле у которых активити = тру
@@ -204,6 +203,7 @@ foreach ($files as $file) {
 
     fwrite($filePointer, $fileContent . '</body></html>');
     fclose($filePointer);
+    echo '<a href ="result/' . $filename . '.html">' . $filename . '</a><br>';
     chmod("result/" . $filename . ".html", 0777);
 }
 ?>
