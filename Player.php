@@ -45,7 +45,7 @@ class Player
      *
      * @var integer $timeOnTheField
      */
-    private $timeOnTheField;
+    private $timeOnTheField = 0;
 
     /**
      * Массив временных отметок когда игрок получал красную карточку
@@ -58,7 +58,7 @@ class Player
      * Время последнего выпуска на поле
      *
      */
-    private $lastTimeUsed;
+    private $lastTimeUsed = null;
 
     /**
      * Количество забитых голов
@@ -79,6 +79,13 @@ class Player
      *
      */
     private $yelowCards;
+
+    /**
+     * Нахождение игрока на поле
+     *
+     * @var bool $activity
+     */
+    private $activity = false;
 
     /**
      * @return boolean
@@ -263,4 +270,29 @@ class Player
     {
         return $this->number;
     }
+
+    /**
+     * @return boolean
+     */
+    public function isActivity()
+    {
+        return $this->activity;
+    }
+
+    /**
+     * Игрок вызывается на поле
+     */
+    public function enterField()
+    {
+        $this->activity = true;
+    }
+
+    /**
+     * Игрок отзывается с поля
+     */
+    public function leaveField()
+    {
+        $this->activity = false;
+    }
+
 }

@@ -41,6 +41,13 @@ class Team
     private $goals;
 
     /**
+     * Опасные моменты
+     *
+     * @var integer $dangerousMoments
+     */
+    private $dangerousMoments;
+
+    /**
      * @return string
      */
     public function getTitle()
@@ -114,5 +121,20 @@ class Team
         $this->goals = $goals;
     }
 
+    /**
+     * @return int
+     */
+    public function getDangerousMoments()
+    {
+        return $this->dangerousMoments;
+    }
+
+    /**
+     * @param int $dangerousMoments
+     */
+    public function setDangerousMoments($dangerousMoments)
+    {
+        $this->dangerousMoments = $dangerousMoments;
+    }
 
 }

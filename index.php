@@ -7,9 +7,6 @@ $files = scandir('source/matches');
 array_shift($files);
 array_shift($files);
 
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
-
 foreach ($files as $file) {
     $filename = pathinfo($file, PATHINFO_FILENAME);
     $string = mb_convert_encoding(file_get_contents("source/matches/" . $filename . ".json"), 'HTML-ENTITIES', "UTF-8");
@@ -17,7 +14,7 @@ foreach ($files as $file) {
 
     $playersTimeOnTheField = [];
 
-//TODO потом убрать отсюда html куда нибудь в отдельный файл
+//TODO потом убрать отсюда html куда нибудь в отдельный файл (в идеал прикрутить шаблонизатор)
     $fileContent = '<html>
 <head>
     <meta charset="UTF-8">
@@ -78,15 +75,49 @@ foreach ($files as $file) {
                     $teamTwo->setPlayers($teamOnePlayers);
                     $teamTwo->setTitle($record['details']['team2']['title']);
                     $team[$record['details']['team2']['title']] = $teamTwo;
+
+                    $teamOneStartPlayersNumbers = $record['details']['team1']['startPlayerNumbers'];
+
+                    foreach ($teamOneStartPlayersNumbers as $teamOneStartPlayersNumber) {
+                        $teamOne->getPlayers()[$teamOneStartPlayersNumber]->enterField();
+                        $teamOne->getPlayers()[$teamOneStartPlayersNumber]->setLastTimeUsed($record['time']);
+                    }
+
+                    $teamTwoStartPlayersNumbers = $record['details']['team2']['startPlayerNumbers'];
+
+                    foreach ($teamTwoStartPlayersNumbers as $teamTwoStartPlayersNumber) {
+                        $teamTwo->getPlayers()[$teamTwoStartPlayersNumber]->enterField();
+                        $teamTwo->getPlayers()[$teamTwoStartPlayersNumber]->setLastTimeUsed($record['time']);
+                    }
+                }
+
+                $teamOnePlayers = $teamOne->getPlayers();
+
+                foreach ($teamOnePlayers as $player) {
+                    if ($player->isActivity()) {
+                        $player->setLastTimeUsed($record['time']);
+                    }
+                }
+
+                $teamTwoPlayers = $teamTwo->getPlayers();
+
+                foreach ($teamTwoPlayers as $player) {
+                    if ($player->isActivity()) {
+                        $player->setLastTimeUsed($record['time']);
+                    }
                 }
 
                 break;
             case 'dangerousMoment':
                 $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] . '</td>' . '<td>' . $record['description'] . '</td>' . '</tr>';
+                $team[$record['details']['team']]->setDangerousMoments($team[$record['details']['team']]->getDangerousMoments() + 1);
 
                 break;
             case 'yellowCard':
                 $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] . '</td>' . '<td>' . $record['description'] . '</td>' . '</tr>';
+                $players = $team[$record['details']['team']]->getPlayers();
+                $cardReciever = $players[$record['details']['playerNumber']];
+                $cardReciever->setYelowCards($cardReciever->getYelowCards() + 1);
 
                 break;
             case 'goal':
@@ -96,6 +127,7 @@ foreach ($files as $file) {
                 $goalAuthor = $players[$record['details']['playerNumber']];
                 $goalAuthor->setGoals($goalAuthor->getGoals() + 1);
                 //TODO ассистента гола тоже нужно фиксировать
+
                 if (!empty($record['details']['assistantNumber'])) {
                     $goalAssistant = $players[$record['details']['assistantNumber']];
                     $goalAssistant->setGoalPases($goalAssistant->getGoalPases() + 1);
@@ -105,12 +137,42 @@ foreach ($files as $file) {
 
                 break;
             case 'finishPeriod':
+                echo $record['time'] . ' : период зкончился <br>';
                 $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] . '</td>' . '<td>' . $record['description'] . '</td>' . '</tr>';
+
+                //тут нужно подсчитать и зафиксировать время проведенное игроками на поле у которых активити = тру
+                $teamOnePlayers = $teamOne->getPlayers();
+
+                foreach ($teamOnePlayers as $player) {
+                    if ($player->isActivity()) {
+                        $addedTime =  $record['time'] - (int) $player->getLastTimeUsed();
+                        $player->setTimeOnTheField($player->getTimeOnTheField() + $addedTime);
+                    }
+                }
+
+                $teamTwoPlayers = $teamTwo->getPlayers();
+
+                foreach ($teamTwoPlayers as $player) {
+                    if ($player->isActivity()) {
+                        $addedTime =  $record['time'] - (int) $player->getLastTimeUsed();
+                        $player->setTimeOnTheField($player->getTimeOnTheField() + $addedTime);
+                    }
+                }
 
                 break;
             case 'replacePlayer':
                 $eventsTable = $eventsTable . '<tr>' . '<td>' . $record['time'] . '</td>' . '<td>' . $record['description'] . '</td>' . '</tr>';
 
+                $timePlayed = $record['time'] - $team[$record['details']['team']]->getPlayers()[$record['details']['outPlayerNumber']]->getLastTimeUsed();
+                //полученое значение прибавляю к его общему времени на поле
+                $team[$record['details']['team']]->getPlayers()[$record['details']['outPlayerNumber']]->setTimeOnTheField($team[$record['details']['team']]->getPlayers()[$record['details']['outPlayerNumber']]->getTimeOnTheField() + $timePlayed);
+                //ставлю активити на фолс
+                $team[$record['details']['team']]->getPlayers()[$record['details']['outPlayerNumber']]->leaveField();
+
+                //у выходящего игрока ставлю время выхода на поле текущее время
+                $team[$record['details']['team']]->getPlayers()[$record['details']['inPlayerNumber']]->setLastTimeUsed($record['time']);
+                //ставлю активити на тру
+                $team[$record['details']['team']]->getPlayers()[$record['details']['inPlayerNumber']]->enterField();
                 break;
         }
     }
@@ -125,12 +187,14 @@ foreach ($files as $file) {
         $tHead = '<tr>
     <th>Имя игрока</th>
     <th>Голы</th>
+    <th>Время на поле</th>
     <th>Голевые передачи</th>
   </tr>';
         $playersTable = $playersTable . $tHead;
         foreach ($teamItem->getPlayers() as $player) {
             $tableRow = "<tr><td>" . $player->getName() . "</td>
         <td>" . $player->getGoals() . "</td>
+        <td>" . $player->getTimeOnTheField() . "</td>
         <td>" . $player->getGoalPases() . "</td></tr>";
             $playersTable = $playersTable . $tableRow;
         }
